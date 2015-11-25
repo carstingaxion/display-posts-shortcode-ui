@@ -1,16 +1,15 @@
-# Display Posts Shortcode UI ###
-
-**Contributors:** carstenbach
-**Tags:** shortcode ui, shortcake, display-posts, display-posts-shortcode, TinyMCE
-**Requires at least:** 
-**Tested up to:** 4.3.1
-**Stable tag:** 1.0.0
-**License:** GPLv2 or later
-**License URI:** http://www.gnu.org/licenses/gpl-2.0.html
+=== Display Posts Shortcode UI ===
+Contributors: carstenbach
+Tags: shortcode ui, shortcake, display-posts, display-posts-shortcode, TinyMCE
+Requires at least: 
+Tested up to: 4.3.1
+Stable tag: 4.3.1
+License: GPLv3
+License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
 Adds a Shortcake powered UI to the [display-posts] shortcode.
 
-## Description ##
+== Description ==
 
 
 
@@ -27,7 +26,7 @@ The plugin is broken down into four stages:
 3. Define the callback for the wrapper shortcode - fairly standard WP behaviour, nothing new here.
  
 
-## Installation ##
+== Installation ==
 
 1. Upload `/display-posts-shortcode-ui`-folder to your `/wp-content/plugins/` directory
 2. Activate the plugin through the 'Plugins' menu in WordPress
@@ -35,12 +34,12 @@ The plugin is broken down into four stages:
 4. Happy short-coding!
 
 
-## Screenshots ##
+== Screenshots ==
 
 1. 
 2. 
 
-## Changelog ##
+== Changelog ==
 
-### 2015.11.25 ###
+= 2015.11.25 =
 Initial release
