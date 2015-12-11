@@ -22,16 +22,23 @@ defined( 'ABSPATH' ) OR exit;
  * GNU General Public License for more details.
  */
 
+
+if ( !is_admin() ) {
+	return;
+}
+
+
 /*
  * This plugin handles the registration of one shortcode, and the related Shortcode UI:
  *  a. [display-posts-ui] - a wrapper shortcode for [display-posts]
  *
  * The plugin is broken down into four stages:
  *  0. Check to see if Shortcake is running, with an admin notice if not.
- *  1. Register the shortcode - this is standard WP behaviour, nothing new here.
- *  2. Register the Shortcode UI setup for the wrapper shortcode.
- *  3. Define the callback for the advanced shortcode - fairly standard WP behaviour, nothing new here.
+ *  X. Register the shortcode - this is standard WP behaviour, nothing new here.
+ *  1. Register the Shortcode UI setup for the shortcode.
+ *  2. Hook onto first and last [display-posts]-output-filter to add some output buffering and make shortcode-content visible to TinyMCE.
  */
+
 
 
 /*
@@ -58,7 +65,34 @@ function dpsui_detection() {
 	if ( ! function_exists( 'be_display_posts_shortcode' ) ) {
 		add_action( 'admin_notices', 'dpsui_notice_dependency_missing_display_posts_plugin' );
 	}
+	if ( function_exists( 'shortcode_ui_register_for_shortcode' )
+		 &&
+		 function_exists( 'be_display_posts_shortcode' )
+		) {
+
+		/*
+		 * 1. Register the Shortcode UI setup for the shortcode.
+		 */
+		add_action( 'register_shortcode_ui', 'dpsui_shortcode_ui' );
+		//add_action( 'init', 'dpsui_shortcode_ui' );
+
+		/*
+		 * 2. Hook onto first and last [display-posts]-output-filter
+		 */
+		// first filter applied inside the Plugin
+		add_filter('display_posts_shortcode_args', 'dpsui_shortcode_ob_start', 1, 2);
+		// last filter
+		add_filter('display_posts_shortcode_wrapper_close', 'dpsui_shortcode_ob_get_clean', 99999, 2);
+
+		/*
+		 * 3. Load Scripts & Styles
+		 *    Fires at the conclusion of wp_enqueue_media().
+		 */
+		add_action( 'wp_enqueue_media', 'dpsui_assets' );
+	}
 }
+
+
 
 /**
  * Display an administration notice if the user can activate plugins.
@@ -90,31 +124,26 @@ function dpsui_notice_dependency_missing_display_posts_plugin() {
 
 /*
  * 1. Register the shortcodes.
- */
 
-add_action( 'init', 'dpsui_register_shortcode' );
-/**
+
+add_action( 'init', 'dpsui_register_shortcode' ); */
+
+/* *
  * Register two shortcodes, shortcake_dev and shortcake-no-attributes.
  *
  * This registration is done independently of any UI that might be associated with them, so it always happens, even if
  * Shortcake is not active.
  *
  * @since 1.0.0
- */
+
 function dpsui_register_shortcode() {
 	// 
-	add_shortcode( 'display-posts-ui', 'dpsui_shortcode_handler' );
+//	add_shortcode( 'display-posts-ui', 'dpsui_shortcode_handler' );
 }
-
-
-
-
-/*
- * 2. Register the Shortcode UI setup for the shortcodes.
  */
 
-//add_action( 'register_shortcode_ui', 'dpsui_shortcode_ui' );
-add_action( 'init', 'dpsui_shortcode_ui' );
+
+
 /**
  * Shortcode UI setup for the shortcake-no-attributes shortcode.
  *
@@ -128,11 +157,19 @@ function dpsui_shortcode_ui() {
 
 	global $_wp_additional_image_sizes;
 
-	// prpepare [date_compare]
+	// prepare [author]
+	$args = array(
+		'fields' => array('ID','display_name'),
+	);
+	$user_select = wp_list_pluck( get_users( $args ), 'display_name', 'ID' );
+	// Add empty default option
+	array_unshift($user_select, "");
+
+	// prepare [date_compare]
 	// (cloned)
 	$date_compare_ops = array( '=', '!=', '>', '>=', '<', '<=', 'IN', 'NOT IN', 'BETWEEN', 'NOT BETWEEN' );
 
-	// prpepare [date_column]
+	// prepare [date_column]
 	// (cloned)
 	$date_columns = array(
 		'post_date', 'post_date_gmt', 'post_modified', 'post_modified_gmt',
@@ -173,6 +210,8 @@ function dpsui_shortcode_ui() {
 	foreach ( get_tags() as $key => $value) {
 		$post_tags[$value->slug] = $value->name;
 	}
+	// Add empty default option
+	array_unshift($post_tags, "");
 
 	// prepare list of post stati
 	// query for public post_status objects
@@ -185,6 +224,7 @@ function dpsui_shortcode_ui() {
 		$post_status_names[$key] = $value->label;
 	}
 #fb(get_post_stati($args, $output ));
+
 
 	/*
 	 * Define the UI for attributes of the shortcode. Optional.
@@ -218,16 +258,17 @@ function dpsui_shortcode_ui() {
 			'type'        => 'text',
 		),
 		// author - [display-posts] shortcode argument
-		// TODO: select on get_users()
 		array(
 			'label'       => esc_html__( 'Specify the post author by the user_name', 'display-posts-shortcode-ui' ),
 			'description' => '[author] ' . esc_html__( 'Default: empty', 'display-posts-shortcode-ui' ),
 			'attr'        => 'author',
-			'type'        => 'text',
+			//'type'        => 'text',
+			'type'        => 'select',
+			'options'     => $user_select,
 		),
 
 		// category - [display-posts] shortcode argument
-		// TODO: multiselect on get_terms()
+		// TODO: multiselect on get_terms(), AJAX updated on 'change' of [category_display]
 		array(
 			'label'       => esc_html__( 'Specify the category slug (or comma separated list of category slugs)', 'display-posts-shortcode-ui' ),
 			'description' => '[category] ' . esc_html__( 'Default: empty', 'display-posts-shortcode-ui' ),
@@ -241,7 +282,7 @@ function dpsui_shortcode_ui() {
 			'description' => '[category_display] ' . esc_html__( 'Default: category', 'display-posts-shortcode-ui' ),
 			'attr'        => 'category_display',
 			'type'        => 'select',
-			'value'       => 'category',
+#			'value'       => 'category',
 			'options'     => $taxonomy_names,
 		),
 
@@ -285,7 +326,7 @@ function dpsui_shortcode_ui() {
 			'description' => '[date_column] ' . esc_html__( 'Default: post_date', 'display-posts-shortcode-ui' ),
 			'attr'        => 'date_column',
 			'type'        => 'select',
-			'value'       => 'post_date',
+#			'value'       => 'post_date',
 			'options'     => array_combine(
 				$date_columns,
 				$date_columns
@@ -298,7 +339,7 @@ function dpsui_shortcode_ui() {
 			'description' => '[date_compare] ' . esc_html__( 'Default: =', 'display-posts-shortcode-ui' ),
 			'attr'        => 'date_compare',
 			'type'        => 'select',
-			'value'       => '=',
+#			'value'       => '=',
 			'options'     => array_combine(
 				$date_compare_ops,
 				$date_compare_ops
@@ -318,7 +359,7 @@ function dpsui_shortcode_ui() {
 		),
 
 		// date_query_after - [display-posts] shortcode argument
-		// TODO: datepicker with correct format
+		// TODO: [date] with correct format
 		array(
 			'label'       => esc_html__( 'Query posts after Date', 'display-posts-shortcode-ui' ),
 			'description' => '[date_query_after] ' . esc_html__( 'Accepts dates entered in the YYYY-MM-DD format. Default: empty', 'display-posts-shortcode-ui' ),
@@ -353,10 +394,10 @@ function dpsui_shortcode_ui() {
 			'label'       => esc_html__( 'Select (multiple) Posts to list', 'display-posts-shortcode-ui' ),
 			'description' => '[id] ' . esc_html__( 'Default: false', 'display-posts-shortcode-ui' ),
 			'attr'        => 'id',
-			'type'        => 'text',
-#			'type'        => 'post_select',
-#			'query'       => array( 'posts_per_page' => 15 ),
-#			'multiple'    => true,
+#			'type'        => 'text',
+			'type'        => 'post_select',
+			'query'       => array( 'posts_per_page' => 15 ),
+			'multiple'    => true,
 		),
 
 		// ignore_sticky_posts - [display-posts] shortcode argument
@@ -382,7 +423,7 @@ function dpsui_shortcode_ui() {
 			'description' => '[include_title] ' . esc_html__( 'Default: true', 'display-posts-shortcode-ui' ),
 			'attr'        => 'include_title',
 			'type'        => 'checkbox',
-			'value'       => 'true',
+#			'value'       => 'true',
 		),
 
 		// include_author - [display-posts] shortcode argument
@@ -540,7 +581,7 @@ function dpsui_shortcode_ui() {
 			'description' => '[tax_operator] ' . esc_html__( 'How to query the terms (IN, NOT IN, or AND). Default: IN', 'display-posts-shortcode-ui' ),
 			'attr'        => 'tax_operator',
 			'type'        => 'radio',
-			'value'       => 'IN',
+#			'value'       => 'IN',
 			'options'     => array(
 #				''            => esc_html__( 'None', 'display-posts-shortcode-ui' ),
 				'IN'          => 'IN',
@@ -564,7 +605,7 @@ function dpsui_shortcode_ui() {
 			'description' => '[tax_relation] ' . esc_html__( 'Describe the relationship between the multiple taxonomy queries (should the results match all the queries or just one of them). Default: AND', 'display-posts-shortcode-ui' ),
 			'attr'        => 'tax_relation',
 			'type'        => 'radio',
-			'value'       => 'AND',
+#			'value'       => 'AND',
 			'options'     => array(
 				'AND'         => 'AND',
 				'OR'          => 'OR',
@@ -659,7 +700,8 @@ function dpsui_shortcode_ui() {
 		 */
 		'attrs' => apply_filters( 'dpsui_shortcode_ui_fields', $fields ),
 	);
-	shortcode_ui_register_for_shortcode( 'display-posts-ui', $shortcode_ui_args );
+#	shortcode_ui_register_for_shortcode( 'display-posts-ui', $shortcode_ui_args );
+	shortcode_ui_register_for_shortcode( 'display-posts', $shortcode_ui_args );
 
 }
 
@@ -670,11 +712,11 @@ function dpsui_shortcode_ui() {
  * 3. Define the callback for the advanced shortcode.
  */
 
-/**
+/* *
  * Callback for the shortcake_dev shortcode.
  *
  * It renders the shortcode based on supplied attributes.
- */
+
 function dpsui_shortcode_handler( $attr, $content, $shortcode_tag ) {
 
 	// Default shortcode attributes
@@ -701,4 +743,28 @@ function dpsui_shortcode_handler( $attr, $content, $shortcode_tag ) {
 	ob_start();
 	echo do_shortcode( "[display-posts $arguments]" );
 	return ob_get_clean();
+}
+ */
+function dpsui_shortcode_ob_start( $args, $original_atts ) {
+	// Shortcode callbacks must return content, hence, output buffering here.
+	ob_start();
+	return $args;
+}
+function dpsui_shortcode_ob_get_clean( $wrapper, $original_atts ) {
+	// Shortcode callbacks must return content, hence, output buffering here.
+	echo ob_get_clean();
+	return $wrapper;
+}
+
+
+
+function dpsui_assets() {
+	// Use minified libraries if SCRIPT_DEBUG is turned off
+	$use_min_version = ( defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ) ? '' : '.min';
+
+	wp_register_script( 'diplay-posts-ui', plugins_url('display-posts-shortcode-ui/assets/js/dpsui'.$use_min_version.'.js'), array('jquery','shortcode-ui'), null, true );
+	wp_enqueue_script(  'diplay-posts-ui' );
+
+#	wp_register_style( 'diplay-posts-ui', plugins_url('display-posts-shortcode-ui/assets/css/dpsui'.$use_min_version.'.css'), false, null, 'screen' );
+#	wp_enqueue_style(  'display-posts-ui' );
 }
