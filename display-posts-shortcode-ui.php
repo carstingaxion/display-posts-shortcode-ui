@@ -763,6 +763,8 @@ function dpsui_assets() {
 	$use_min_version = ( defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ) ? '' : '.min';
 
 	wp_register_script( 'diplay-posts-ui', plugins_url('display-posts-shortcode-ui/assets/js/dpsui'.$use_min_version.'.js'), array('jquery','shortcode-ui'), null, true );
+#	wp_register_script( 'diplay-posts-ui', plugins_url('display-posts-shortcode-ui/assets/js/dpsui.backbone.view'.$use_min_version.'.js'), array('jquery', 'backbone','shortcode-ui'), null, true );
+#	wp_register_script( 'diplay-posts-ui', plugins_url('display-posts-shortcode-ui/assets/js/dpsui.backbone.view'.$use_min_version.'.js'), array('media-views','shortcode-ui'), null, true );
 	wp_enqueue_script(  'diplay-posts-ui' );
 
 #	wp_register_style( 'diplay-posts-ui', plugins_url('display-posts-shortcode-ui/assets/css/dpsui'.$use_min_version.'.css'), false, null, 'screen' );
